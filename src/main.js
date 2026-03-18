@@ -7,7 +7,6 @@ import { renderSidebar } from './components/sidebar.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderLibrary } from './views/library.js';
 import { renderEditor } from './views/editor.js';
-import { renderEditor } from './views/editor.js';
 import { renderAuth } from './views/auth.js';
 import { supabase } from './supabase.js';
 import store from './store.js';
@@ -16,7 +15,6 @@ import { showToast } from './toast.js';
 async function init() {
     const app = document.getElementById('app');
 
-    // Render sidebar
     // Render sidebar
     const sidebar = await renderSidebar(app);
 
