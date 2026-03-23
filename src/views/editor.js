@@ -368,40 +368,57 @@ export async function renderEditor(container, params) {
   });
 
   // --- Save ---
-  async function doSave() {
+  // --- Save ---
+  async function doSave(silent = false) {
     if (!title.trim()) {
-      showToast('Please add a title', 'error');
-      titleInput.focus();
-      return;
+      if (!silent) {
+        showToast('Please add a title', 'error');
+        titleInput.focus();
+      }
+      return false;
     }
     if (!content.trim()) {
-      showToast('Please add prompt content', 'error');
-      contentArea.focus();
-      return;
+      if (!silent) {
+        showToast('Please add prompt content', 'error');
+        contentArea.focus();
+      }
+      return false;
     }
 
-    if (isNew) {
-      const created = await store.createPrompt({ title, content, category, tags, rating });
-      markClean();
-      showToast('Prompt created!', 'success');
-      location.hash = `#/editor/${created.id}`;
-    } else {
-      await store.updatePrompt(params.id, { title, content, category, tags, rating });
-      markClean();
-      showToast('Changes saved!', 'success');
+    try {
+      if (isNew) {
+        const created = await store.createPrompt({ title, content, category, tags, rating });
+        markClean();
+        if (!silent) showToast('Prompt created!', 'success');
+        location.hash = `#/editor/${created.id}`;
+        return created;
+      } else {
+        const updated = await store.updatePrompt(params.id, { title, content, category, tags, rating });
+        markClean();
+        if (!silent) showToast('Changes saved!', 'success');
+        return updated;
+      }
+    } catch (err) {
+      if (!silent) showToast('Error saving: ' + err.message, 'error');
+      return false;
     }
   }
 
-  container.querySelector('#editor-save').addEventListener('click', doSave);
+  container.querySelector('#editor-save').addEventListener('click', () => doSave(false));
 
   // Save as new version
   const saveVersionBtn = container.querySelector('#editor-save-version');
   if (saveVersionBtn) {
     saveVersionBtn.addEventListener('click', async () => {
+      // Re-fetch current values before saving version
+      const currentTitle = titleInput.value;
+      const currentContent = contentArea.value;
+
       const notes = window.prompt('Version notes (optional):', `v${(prompt.versions.length + 1)}`);
       if (notes === null) return;
+
       await store.addVersion(params.id, notes || `Version ${prompt.versions.length + 1}`);
-      await store.updatePrompt(params.id, { title, content, category, tags, rating });
+      await store.updatePrompt(params.id, { title: currentTitle, content: currentContent, category, tags, rating });
       showToast('Version saved!', 'success');
       await renderEditor(container, params);
     });
@@ -450,7 +467,7 @@ export async function renderEditor(container, params) {
 
   // Select an AI tool from the menu
   if (aiToolMenu) {
-    aiToolMenu.addEventListener('click', (e) => {
+    aiToolMenu.addEventListener('click', async (e) => {
       const opt = e.target.closest('.ai-tool-option');
       if (!opt) return;
       e.stopPropagation();
@@ -461,8 +478,9 @@ export async function renderEditor(container, params) {
       opt.classList.add('active');
       aiDropdown.classList.remove('open');
 
-      // Immediately open the selected tool
+      // PRE-SAVE before opening the tool
       if (!content.trim()) return;
+      await doSave(true); // Save silently
       openAiTool(selectedAiTool, content);
     });
   }
