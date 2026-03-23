@@ -156,6 +156,10 @@ async function buildSidebarHTML() {
         <span class="nav-item-icon">✨</span>
         <span class="nav-item-text">New Prompt</span>
       </div>
+      <div class="nav-item" data-route="/templates">
+        <span class="nav-item-icon">📋</span>
+        <span class="nav-item-text">Templates</span>
+      </div>
 
       <div class="nav-section-title" style="margin-top: var(--space-4)">
         Categories
