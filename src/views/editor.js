@@ -152,7 +152,18 @@ export async function renderEditor(container, params) {
             <button class="btn btn-primary btn-lg" id="editor-save">💾 ${isNew ? 'Create Prompt' : 'Save Changes'}</button>
             ${!isNew ? `<button class="btn btn-secondary btn-lg" id="editor-save-version">📌 Save as New Version</button>` : ''}
             <button class="btn btn-secondary" id="editor-copy" ${!content.trim() ? 'disabled style="opacity:0.4;pointer-events:none;"' : ''}>📋 Copy to Clipboard</button>
-            <button class="btn btn-secondary" id="editor-test" ${!content.trim() ? 'disabled style="opacity:0.4;pointer-events:none;"' : ''}>🧪 Test Prompt</button>
+            <div class="ai-tool-dropdown" id="ai-tool-dropdown">
+              <button class="btn btn-secondary btn-ai-test" id="editor-test" ${!content.trim() ? 'disabled style="opacity:0.4;pointer-events:none;"' : ''}>
+                🧪 Test with <span id="ai-tool-label">ChatGPT</span> <span class="ai-caret">▾</span>
+              </button>
+              <div class="ai-tool-menu" id="ai-tool-menu">
+                <button class="ai-tool-option active" data-tool="chatgpt"><img src="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg" width="16" height="16" alt=""> ChatGPT</button>
+                <button class="ai-tool-option" data-tool="gemini"><span class="ai-tool-emoji">✨</span> Gemini</button>
+                <button class="ai-tool-option" data-tool="claude"><span class="ai-tool-emoji">🟠</span> Claude</button>
+                <button class="ai-tool-option" data-tool="copilot"><span class="ai-tool-emoji">🤖</span> Copilot</button>
+                <button class="ai-tool-option" data-tool="perplexity"><span class="ai-tool-emoji">🔍</span> Perplexity</button>
+              </div>
+            </div>
             ${!isNew ? `<button class="btn btn-secondary" id="editor-duplicate">📄 Use as Template</button>` : ''}
             ${!isNew ? `<button class="btn btn-danger" id="editor-delete">🗑 Delete</button>` : ''}
           </div>
@@ -412,12 +423,53 @@ export async function renderEditor(container, params) {
     });
   });
 
-  // --- Test Prompt ---
-  container.querySelector('#editor-test').addEventListener('click', () => {
-    if (!content.trim()) return;
-    const encoded = encodeURIComponent(content);
-    window.open(`https://chatgpt.com/?q=${encoded}`, '_blank');
-    showToast('Opening ChatGPT with your prompt…', 'success');
+  // --- Test Prompt with AI Tool Selection ---
+  let selectedAiTool = localStorage.getItem('preferredAiTool') || 'chatgpt';
+  const aiToolNames = { chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude', copilot: 'Copilot', perplexity: 'Perplexity' };
+  const aiToolLabel = container.querySelector('#ai-tool-label');
+  const aiToolMenu = container.querySelector('#ai-tool-menu');
+  const aiDropdown = container.querySelector('#ai-tool-dropdown');
+
+  // Set initial label from saved preference
+  if (aiToolLabel) aiToolLabel.textContent = aiToolNames[selectedAiTool] || 'ChatGPT';
+  // Mark the saved tool as active
+  if (aiToolMenu) {
+    aiToolMenu.querySelectorAll('.ai-tool-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.tool === selectedAiTool);
+    });
+  }
+
+  // Toggle dropdown menu
+  const testDropdownBtn = container.querySelector('#editor-test');
+  if (testDropdownBtn) {
+    testDropdownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      aiDropdown.classList.toggle('open');
+    });
+  }
+
+  // Select an AI tool from the menu
+  if (aiToolMenu) {
+    aiToolMenu.addEventListener('click', (e) => {
+      const opt = e.target.closest('.ai-tool-option');
+      if (!opt) return;
+      e.stopPropagation();
+      selectedAiTool = opt.dataset.tool;
+      localStorage.setItem('preferredAiTool', selectedAiTool);
+      aiToolLabel.textContent = aiToolNames[selectedAiTool];
+      aiToolMenu.querySelectorAll('.ai-tool-option').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      aiDropdown.classList.remove('open');
+
+      // Immediately open the selected tool
+      if (!content.trim()) return;
+      openAiTool(selectedAiTool, content);
+    });
+  }
+
+  // Close dropdown on outside click
+  document.addEventListener('click', () => {
+    if (aiDropdown) aiDropdown.classList.remove('open');
   });
 
   // --- Duplicate / Use as Template ---
@@ -545,4 +597,23 @@ function showDiffModal(oldText, newText, versionLabel) {
 
 function escapeHtmlStatic(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// --- AI Tool Launcher ---
+function openAiTool(tool, promptText) {
+  const enc = encodeURIComponent(promptText);
+  const urls = {
+    chatgpt: `https://chatgpt.com/?q=${enc}`,
+    gemini: `https://gemini.google.com/app?q=${enc}`,
+    claude: `https://claude.ai/new?q=${enc}`,
+    copilot: `https://copilot.microsoft.com/?q=${enc}`,
+    perplexity: `https://www.perplexity.ai/?q=${enc}`
+  };
+
+  navigator.clipboard.writeText(promptText).then(() => {
+    showToast(`Copied! Opening ${tool}... You may need to paste the prompt.`, 'success');
+    window.open(urls[tool] || urls.chatgpt, '_blank');
+  }).catch(() => {
+    window.open(urls[tool] || urls.chatgpt, '_blank');
+  });
 }
